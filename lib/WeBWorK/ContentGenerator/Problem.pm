@@ -234,7 +234,7 @@ sub attemptResults {
 		dvipng_depth_db => $imagesModeOptions{dvipng_depth_db},
 	);
 	
-	my $showEvaluatedAnswers = $ce->{pg}->{options}->{showEvaluatedAnswers}//'';
+	my $showEvaluatedAnswers = $ce->{pg}->{options}->{showEvaluatedAnswers}||'';
 
 	my $header;
 	#$header .= CGI::th("Part");
@@ -366,7 +366,7 @@ sub previewAnswer {
 	
 	if ($displayMode eq "plainText") {
 		return $tex;
-	} elsif (($answerResult->{type}//'') eq 'essay') {
+	} elsif (($answerResult->{type}||'') eq 'essay') {
 	    return $tex;
 	} elsif ($displayMode eq "formattedText") {
 		
@@ -810,9 +810,9 @@ sub warnings {
 		print CGI::p($r->maketext("Unable to obtain error messages from within the PG question." ));
 		print CGI::end_div();
     } elsif ( $self->{pgerrors} > 0 ) {
-        my @pgdebug          = @{ $self->{pgdebug}           }//();
- 		my @pgwarning        = @{ $self->{pgwarning}         }//();
- 		my @pginternalerrors = @{ $self->{pginternalerrors}  }//();
+        my @pgdebug          = @{ $self->{pgdebug}           };
+ 		my @pgwarning        = @{ $self->{pgwarning}         };
+ 		my @pginternalerrors = @{ $self->{pginternalerrors}  };
 		print CGI::start_div();
 		print CGI::h3({style=>"color:red;"}, $r->maketext("PG question processing error messages"));
 		print CGI::p(CGI::h3($r->maketext("PG debug messages" ) ),  join(CGI::br(), @pgdebug  )  )  if @pgdebug   ;
