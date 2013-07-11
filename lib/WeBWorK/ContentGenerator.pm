@@ -2026,7 +2026,7 @@ Prints javascript calls needed to run mathview.
 sub mathview_scripts {
 	my $self = shift;
 	my $ce = $self->r->ce;
-	my $enable_mathview = $ce->{pg}{specialPGEnvironmentVars}{MathView}//0; # initialize to zero if undefined.
+	my $enable_mathview = $ce->{pg}{specialPGEnvironmentVars}{MathView}||0; # initialize to zero if undefined.
 	my $site_url = $ce->{webworkURLs}->{htdocs};
 	my $MathJax = $ce->{webworkURLs}->{MathJax};
 # FIXME -- this gives the correct locations for release/2.7 but is 
