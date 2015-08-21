@@ -13,11 +13,6 @@ var basicRequestObject = {
 
 var basicWebserviceURL = "/webwork2/instructorXMLHandler";
 
-// For watermark of sample text for adding set text box
-$(function() {
- $('input[example]').each(function(a,b) { $(b).watermark($(b).attr('example')+'   '  ) } )
- $('textarea[example]').each(function(a,b) { $(b).watermark($(b).attr('example')+'   ', {useNative:false}  ) } )
-});
 
 // Messaging
 
@@ -212,11 +207,13 @@ function addemcallback(wsURL, ro, probarray, count) {
       if(count!=1) { phrase += "s";}
      // alert("Added "+phrase+" to "+ro.set);
       markinset();
+
 	  var prbs = "problems";
 	  if(ro.total == 1) { 
 		prbs = "problem";
 	  }
 	  goodmsg("Added "+ro.total+" "+prbs+" to set "+ro.set_id);
+
       return true;
     };
   }
@@ -244,6 +241,7 @@ function markinset() {
     var arr = response.result_data;
     var pathhash = {};
     for(var i=0; i<arr.length; i++) {
+	  arr[i] = arr[i].path;
       arr[i] = arr[i].replace(/^\//,'');
       pathhash[arr[i]] = 1;
     }
@@ -267,14 +265,14 @@ function delrow(num) {
   var cnt = 1;
   var loop = 1;
   var mymltM = $('#mlt'+num);
-  if(mymltM) {
-    mymltM = mymltM.text();
-  } else {
-    mymltM = 'L';  // So we don't delete extra stuff below
+  var mymltMtext = 'L'; // so extra stuff is not deleted
+ if(mymltM) {
+    mymltMtext = mymltM.text();
   }
   $('#pgrow'+num).remove(); 
   delFromPGList(num, path);
-  if((mymlt > 0) && mymltM=='M') { // delete hidden problems
+    if((mymlt > 0) && mymltMtext=='M') { // delete hidden problems
+    var table_num = num;
     while((newmlt = $('[name="all_past_mlt'+ APLindex +'"]')) && newmlt.val() == mymlt) {
       cnt += 1;
       num++;
@@ -282,7 +280,20 @@ function delrow(num) {
       $('#pgrow'+num).remove(); 
       delFromPGList(num, path);
     }
-  }
+    $('#mlt-table'+table_num).remove();
+    } else if ((mymlt > 0) && $('.MLT'+mymlt).length == 0) {
+	  $('#mlt-table'+num).remove();
+   } else if ((mymlt > 0) && mymltMtext=='L') {
+      var new_num = $('#mlt-table'+num+' .MLT'+mymlt+':first')
+	   .attr('id').match(/pgrow([0-9]+)/)[1];
+      $('#mlt-table'+num).attr('id','mlt-table'+new_num);
+      var onclickfunction = mymltM.attr('onclick').replace(num,new_num);
+      mymltM.attr('id','mlt'+new_num).attr('onclick', onclickfunction);
+      mymltM.insertAfter('#inset'+new_num);
+      var classstr = $('#pgrow'+new_num).attr('class')
+	  .replace('MLT'+mymlt,'NS'+new_num);
+      $('#pgrow'+new_num).attr('class',classstr);
+   }
   // Update various variables in the page
   var n1 = $('#lastshown').text();
   var n2 = $('#totalshown').text();
@@ -331,8 +342,8 @@ function randomize(filepath, el) {
   var ro = init_webservice('renderProblem');
   var templatedir = $('#hidden_templatedir').val();
   ro.problemSeed = seed;
-  ro.problemSource = templatedir + '/' + filepath;
-  ro.set = ro.problemSource;
+  ro.problemPath = templatedir + '/' + filepath;
+  ro.set = ro.problemPath;
   var showhint = 0;
   if($("input[name='showHints']").is(':checked')) { showhint = 1;}
   var showsoln = 0;
@@ -352,6 +363,14 @@ function randomize(filepath, el) {
       MathJax.Hub.Queue(["Typeset",MathJax.Hub,el]);
     if(displayMode=='jsMath')
       jsMath.ProcessBeforeShowing(el);
+
+    if(displayMode=='asciimath') {
+      //processNode(el);
+      translate();
+    }
+    if(displayMode=='LaTeXMathML') {
+      AMprocessNode(document.getElementsByTagName("body")[0], false);
+    }
     //console.log(data);
   });
   return false;
@@ -362,6 +381,7 @@ function togglemlt(cnt,noshowclass) {
   var count = $('.'+noshowclass).length;
   var n1 = $('#lastshown').text();
   var n2 = $('#totalshown').text();
+
   if($('#mlt'+cnt).text()=='M') {
     $('.'+noshowclass).show();
     $('#mlt'+cnt).text("L");

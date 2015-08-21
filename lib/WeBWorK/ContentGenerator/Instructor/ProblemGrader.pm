@@ -37,7 +37,6 @@ sub pre_header_initialize {
 	my $db = $r->db;
 	my $authz = $r->authz;
 	my $urlpath = $r->urlpath;
-	my $user = $r->param('user');
 	
 	my $setName = $urlpath->arg("setID");
 	my $problemNumber = $r->urlpath->arg("problemID");
@@ -47,10 +46,13 @@ sub pre_header_initialize {
 	my $editMode = $r->param("editMode");
 	
 	# Check permissions
-	return unless $authz->hasPermissions($user, "access_instructor_tools");	
-	return unless $authz->hasPermissions($user, "score_sets");
+	return unless $authz->hasPermissions($userName, "access_instructor_tools");	
+	return unless $authz->hasPermissions($userName, "score_sets");
 
-	my $displayMode        = $r->param("displayMode") || $ce->{pg}->{options}->{displayMode};
+	my $user = $db->getUser($userName);
+	die "Couldn't find user $user" unless $user;
+
+	my $displayMode  = $user->displayMode ? $user->displayMode : $ce->{pg}->{options}->{displayMode};
 	$self->{displayMode}    = $displayMode;
 }
 
@@ -71,20 +73,6 @@ sub head {
 	
 	return "";
 
-}
-
-
-sub options {
-	my ($self) = @_;
-	
-	my $displayMode = $self->{displayMode};
-	
-	my @options_to_show = "displayMode";
-	
-	return $self->optionsMacro(
-		options_to_show => \@options_to_show,
-
-	);
 }
 
 
@@ -129,7 +117,6 @@ sub initialize {
 		#if the instructor added a comment we should save that to the latest answer
 		if ($r->param("$userID.comment")) {
 		    my $comment = $r->param("$userID.comment");
-	        
 		    my $userPastAnswerID = $db->latestProblemPastAnswer($courseName, $userID, $setID, $problemID); 
 		    
 		    if ($userPastAnswerID) {
@@ -224,11 +211,7 @@ sub body {
 	print CGI::start_form({method=>"post", action => $self->systemLink( $urlpath, authen=>0), id=>"problem-grader-form", name=>"problem-grader-form" });
 	 
 	my $selectAll =CGI::input({-type=>'button', -name=>'check_all', -value=>'Mark All',
-				   onClick => "for (i in document.forms['problem-grader-form'].elements)  { 
-	                       if (document.forms['problem-grader-form'].elements[i].className == 'mark_correct') { 
-	                           document.forms['problem-grader-form'].elements[i].checked = true
-	                       }
-	                    }" });
+				   onClick => "\$('.mark_correct').each(function () { if (\$(this).attr('checked')) {\$(this).attr('checked',false);} else {\$(this).attr('checked',true);}});" });
 
 	print CGI::start_table({width=>"1020px"});
 	print CGI::Tr({-valign=>"top"}, CGI::th(["Section", "Name","&nbsp;","Latest Answer","&nbsp;","Mark Correct<br>".$selectAll, "&nbsp;", "Score (%)", "&nbsp;", "Comment"]));

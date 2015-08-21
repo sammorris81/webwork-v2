@@ -206,7 +206,7 @@ sub next_prob_group {
 	return -1 if($ind >= $len-1);
 	my $mlt= $pgfiles[$ind]->{morelt} || 0;
 	return $ind+1 if($mlt == 0);
-	while($ind<$len and ($pgfiles[$ind]->{morelt} || 0) == $mlt) {
+	while($ind<$len and defined($pgfiles[$ind]->{morelt}) and $pgfiles[$ind]->{morelt} == $mlt) {
 		$ind++;
 	}
 	return -1 if($ind==$len);
@@ -502,7 +502,7 @@ sub browse_library_panel1 {
 	print CGI::Tr(CGI::td({-class=>"InfoPanel", -align=>"left"}, 
 		CGI::start_table(),
 			CGI::Tr({},
-				CGI::td(["Chapter:",
+				CGI::td([$r->maketext("Chapter:"),
 					CGI::popup_menu(-name=> 'library_chapters', 
 					                -values=>\@chaps,
 					                -default=> $chapter_selected,
@@ -510,7 +510,7 @@ sub browse_library_panel1 {
 					),
 					CGI::submit(-name=>"lib_select_chapter", -value=>"Update Section List")])),
 			CGI::Tr({},
-				CGI::td("Section:"),
+				CGI::td($r->maketext("Section:")),
 				CGI::td({-colspan=>2},
 					CGI::popup_menu(-name=> 'library_sections', 
 					                -values=>\@sects,
@@ -810,7 +810,7 @@ sub make_top_row {
 																 ($browse_which eq "browse_$lib")? (-disabled=>1): ())
 			if (-d "$ce->{courseDirs}{templates}/$lib");
 	}
-	$libs = CGI::br()."or Problems from".$libs if $libs ne '';
+	$libs = CGI::br().$r->maketext("or Problems from").$libs if $libs ne '';
 
 	my $these_widths = "width: 24ex";
 
@@ -1006,9 +1006,9 @@ sub make_data_row {
 		my $numchild = scalar(@{$sourceFileData->{children}});
 		$mlt = "<span id='mlt$cnt' onclick='togglemlt($cnt,\"$noshowclass\")' title='Show $numchild more like this' style='cursor:pointer'>M</span>";
 		$noshowclass = "NS$cnt";
-		$mltstart = "<table style='border:1px solid black' width='100%'><tr><td>\n";
+		$mltstart = "<tr><td><table id='mlt-table$cnt' style='border:1px solid black' width='100%'><tr><td>\n";
 	}
-	$mltend = "</td></tr></table>\n" if($mltnumleft==0);
+	$mltend = "</td></tr></table></td></tr>\n" if($mltnumleft==0);
 	my $noshow = '';
 	$noshow = 'display: none' if($sourceFileData->{noshow});
 
@@ -1030,9 +1030,9 @@ sub make_data_row {
 
 	my $rerand = '<span style="display: inline-block" onclick="randomize(\''.$sourceFileName.'\',\'render'.$cnt.'\')" title="Randomize"><i class="icon-random" ></i></span>';
 
+	print $mltstart;
 	# Print the cell
 	print CGI::Tr({-align=>"left", -id=>"pgrow$cnt", -style=>$noshow, class=>$noshowclass }, CGI::td(
-        $mltstart,
 		CGI::div({-style=>"background-color: #FFFFFF; margin: 0px auto"},
 		    CGI::span({-style=>"text-align: left"},CGI::button(-name=>"add_me", 
 		      -value=>"Add",
@@ -1051,9 +1051,9 @@ sub make_data_row {
 		#CGI::br(),
 		CGI::hidden(-name=>"filetrial$cnt", -default=>$sourceFileName,-override=>1),
                 $tagwidget,
-		CGI::div($problem_output),
-        $mltend
+		CGI::div($problem_output)
 	));
+	print $mltend;
 }
 
 sub clear_default {
@@ -1324,7 +1324,8 @@ sub pre_header_initialize {
 				push @pg_files, $problemRecord->source_file;
 
 			}
-			@pg_files = sortByName(undef,@pg_files);
+			# Don't sort, leave them in the order they appeared in the set
+			#@pg_files = sortByName(undef,@pg_files);
 			@pg_files = map {{'filepath'=> $_, 'morelt'=>0}} @pg_files;
 			$use_previous_problems=0;
 		}
@@ -1383,9 +1384,23 @@ sub pre_header_initialize {
 				$newSetRecord->set_id($newSetName);
 				$newSetRecord->set_header("defaultHeader");
 				$newSetRecord->hardcopy_header("defaultHeader");
-				$newSetRecord->open_date(time()+60*60*24*7); # in one week
-				$newSetRecord->due_date(time()+60*60*24*7*2); # in two weeks
-				$newSetRecord->answer_date(time()+60*60*24*7*3); # in three weeks
+				# It's convenient to set the due date two weeks from now so that it is 
+				# not accidentally available to students.  
+				
+				my $dueDate = time+2*60*60*24*7;
+				my $display_tz = $ce->{siteDefaults}{timezone};
+				my $fDueDate = $self->formatDateTime($dueDate, $display_tz);
+				my $dueTime = $ce->{pg}{timeAssignDue};
+				
+				# We replace the due time by the one from the config variable
+				# and try to bring it back to unix time if possible
+				$fDueDate =~ s/\d\d:\d\d(am|pm|AM|PM)/$dueTime/;
+				
+				$dueDate = $self->parseDateTime($fDueDate, $display_tz);
+				$newSetRecord->open_date($dueDate - 60*$ce->{pg}{assignOpenPriorToDue});
+				$newSetRecord->due_date($dueDate);
+				$newSetRecord->answer_date($dueDate + 60*$ce->{pg}{answersOpenAfterDueDate});	
+				
 				$newSetRecord->visible(1);
 				$newSetRecord->enable_reduced_scoring(0);
 				eval {$db->addGlobalSet($newSetRecord)};
@@ -1505,12 +1520,8 @@ sub pre_header_initialize {
 
 
 sub title {
-	return "Library Browser";
-}
-
-# hide view options panel since it distracts from SetMaker's built-in view options
-sub options {
-	return "";
+	my ($self) = @_;
+	return $self->r->maketext("Library Browser");
 }
 
 sub head {
@@ -1527,14 +1538,14 @@ sub head {
   print qq!<script src="$webwork_htdocs_url/js/vendor/underscore/underscore.js"></script>!;
   print qq!<script src="$webwork_htdocs_url/js/legacy/vendor/modernizr-2.0.6.js"></script>!;
   print qq!<script src="$webwork_htdocs_url/js/vendor/backbone/backbone.js"></script>!;
-  print qq!<script src="$webwork_htdocs_url/js/vendor/bootstrap/js/bootstrap.min.js"></script>!;
+  #print qq!<script src="$webwork_htdocs_url/js/vendor/bootstrap/js/bootstrap.min.js"></script>!;
   print qq!<link href="$webwork_htdocs_url/css/ui-lightness/jquery-ui-1.8.16.custom.css" rel="stylesheet" type="text/css"/>!;
   print "\n";
 	print CGI::start_script({type=>"text/javascript", src=>"$webwork_htdocs_url/js/legacy/Base64.js"}), CGI::end_script();
   print "\n";
 	print qq{
            <link href="$webwork_htdocs_url/css/knowlstyle.css" rel="stylesheet" type="text/css" />
-           <script type="text/javascript" src="$webwork_htdocs_url/js/vendor/other/knowl.js"></script>};
+           <script type="text/javascript" src="$webwork_htdocs_url/js/legacy/vendor/knowl.js"></script>};
   print "\n";
   print qq!<link href="$webwork_htdocs_url/css/ui-lightness/jquery-ui-1.8.16.custom.css" rel="stylesheet" type="text/css"/>!;
   print "\n";
@@ -1562,7 +1573,7 @@ sub body {
 	my $authz = $r->authz;
 	unless ($authz->hasPermissions($userName, "modify_problem_sets")) {
 		print "User $userName returned " . 
-			$authz->hasPermissions($user, "modify_problem_sets") . 
+			$authz->hasPermissions($userName, "modify_problem_sets") . 
 	" for permission";
 		return(CGI::div({class=>'ResultsWithError'},
 		CGI::em("You are not authorized to access the Instructor tools.")));
@@ -1669,7 +1680,7 @@ sub body {
 		);
 	}
 	#	 }
-	print CGI::endform(), "\n";
+	print CGI::end_form(), "\n";
 
 	return "";	
 }

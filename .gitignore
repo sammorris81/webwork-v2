@@ -1,7 +1,16 @@
-vn
-.DS_Store
-.*
+*.conf
+*-config
+applets
+tmp
+logs
+courses.dist
+library-directory-tree.json
+library-subject-tree.json
+textbook-tree.json
+development.yml
 *~
+!tmp/README
+!htdocs/tmp/README
 *.save
 htdocs/tmp/*
 tmp/*
@@ -10,6 +19,7 @@ conf/*.conf
 conf/*.apache2-config
 htdocs/site_info.txt
 htdocs/applets/*.swf
+htdocs/DATA/*
 bin/wwapache2ctl
 webwork2.komodoproject
 #courses.dist/*
@@ -18,3 +28,7 @@ node_modules/*
 WeBWorK.sublime-project
 WeBWorK.sublime-workspace
 conf/*.apache-config
+math4-overrides.css
+math4-overrides.js
+DATA/*
+*.swp
